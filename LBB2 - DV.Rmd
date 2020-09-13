@@ -1,0 +1,483 @@
+---
+title: 'LBB2 - UK Road Safety: Traffic Accidents (2005-2017)'
+author: "Nadya"
+date: "06/09/2020"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 1
+    toc_float: true
+    code_folding: "hide"
+    df_print: paged
+    theme: "paper"
+    highlight: "pygments"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **Explanation** {.tabset}
+## Brief 
+
+Welcome!
+
+For this LBB, this research will use UK Road Safety: Traffic Accidents (2005-2017).
+
+reference: https://www.kaggle.com/tsiaras/uk-road-safety-accidents-and-vehicles
+
+## Data's Point of View 
+
+These files provide detailed road safety data about the circumstances of personal injury road accidents in GB from 1979, the types of vehicles involved and the consequential casualties. The statistics relate only to personal injury accidents on public roads that are reported to the police, and subsequently recorded, using the STATS19 accident reporting form.
+
+<P>
+
+# **Data Inspection** {.tabset}
+
+## Library
+```{r message=FALSE, error=FALSE, warning=FALSE}
+library(lubridate)
+library(dplyr)
+library(ggpubr)
+library(ggplot2)
+library(scales)
+library(RColorBrewer)
+library(ggridges)
+library(leaflet)
+library(tidyverse)
+```
+
+
+## Data source:
+```{r data}
+traffic<-read.csv("Accident_Information.csv")
+```
+
+## First 6 data
+```{r data head}
+head(traffic)
+```
+
+
+## last 6 data
+```{r data tail}
+tail(traffic)
+```
+
+
+## Data dimension
+```{r data dim}
+dim(traffic)
+```
+
+
+## Column Names
+```{r data colnames}
+names(traffic)
+```
+
+
+# **Data Cleansing & Coercion** {.tabset}
+
+## check variable type
+```{r data variable}
+glimpse(traffic)
+```
+
+## Data Coertion {.tabset}
+
+### Change to Factor/ Categorical
+```{r data coertion to factor}
+traffic$X1st_Road_Class <- as.factor(traffic$X1st_Road_Class)
+traffic$X1st_Road_Number <- as.factor(traffic$X1st_Road_Number)
+traffic$X2nd_Road_Class <- as.factor(traffic$X2nd_Road_Class)
+traffic$X2nd_Road_Number <- as.factor(traffic$X2nd_Road_Number)
+traffic$Accident_Severity <- as.factor(traffic$Accident_Severity)
+traffic$Carriageway_Hazards <- as.factor(traffic$Carriageway_Hazards)
+traffic$Day_of_Week <- as.factor(traffic$Day_of_Week)
+traffic$Did_Police_Officer_Attend_Scene_of_Accident <- as.factor(traffic$Did_Police_Officer_Attend_Scene_of_Accident)
+traffic$Junction_Control <- as.factor(traffic$Junction_Control)
+traffic$Junction_Detail <- as.factor(traffic$Junction_Detail)
+traffic$Light_Conditions <- as.factor(traffic$Light_Conditions)
+traffic$Local_Authority_.District. <- as.factor(traffic$Local_Authority_.District.)
+traffic$Local_Authority_.Highway. <- as.factor(traffic$Local_Authority_.Highway.)
+traffic$Location_Easting_OSGR <- as.factor(traffic$Location_Easting_OSGR)
+traffic$Location_Northing_OSGR <- as.factor(traffic$Location_Northing_OSGR)
+traffic$LSOA_of_Accident_Location <- as.factor(traffic$LSOA_of_Accident_Location)
+traffic$Police_Force <- as.factor(traffic$Police_Force)
+traffic$Road_Surface_Conditions <- as.factor(traffic$Road_Surface_Conditions)
+traffic$Road_Type <- as.factor(traffic$Road_Type)
+traffic$Special_Conditions_at_Site <- as.factor(traffic$Special_Conditions_at_Site)
+traffic$Speed_limit <- as.factor(traffic$Speed_limit)
+traffic$Urban_or_Rural_Area <- as.factor(traffic$Urban_or_Rural_Area)
+traffic$Weather_Conditions <- as.factor(traffic$Weather_Conditions)
+traffic$InScotland <- as.factor(traffic$InScotland)
+traffic$Year <- as.factor(traffic$Year)
+
+```
+
+```{r}
+traffic <- traffic %>% 
+  mutate_if(is.character, as.factor)
+```
+
+
+
+### Change to Date
+```{r message=FALSE, error=FALSE, warning=FALSE}
+
+traffic$Date <- ymd(traffic$Date)
+traffic$Time <- hms(traffic$Time)
+
+```
+
+### Check variable type again
+```{r data variable 2}
+str(traffic)
+```
+
+```{r}
+head(traffic)
+```
+
+
+## Missing Value {.tabset}
+
+### Showed any column that has `NULL` values
+```{r}
+colSums(is.na(traffic))
+
+traffic <- traffic %>% 
+  select(-LSOA_of_Accident_Location)
+```
+
+
+### Remove Column that Unrelated to This Research
+```{r}
+traffic <- subset(traffic, select = -c(X1st_Road_Class, 
+                                       X1st_Road_Number, 
+                                       X2nd_Road_Class, 
+                                       X2nd_Road_Number, 
+                                       Location_Easting_OSGR, 
+                                       Location_Northing_OSGR))
+```
+
+
+### Remove Row that has NA value
+
+```{r}
+traffic2 <- na.omit(traffic, cols = c("Did_Police_Officer_Attend_Scene_of_Accident",
+                                     "Longitude", "Pedestrian_Crossing.Human_Control",
+                                     "Pedestrian_Crossing.Physical_Facilities",
+                                     "Speed_limit",
+                                     "InScotland"))
+```
+
+### Check The Table Again
+
+```{r}
+traffic
+```
+
+
+
+
+# **Data Preparation** {.tabset}
+
+## Brief Explanation
+
+```{r data summary}
+glimpse(traffic)
+```
+
+
+## Create Data Frame
+
+<h3>Junction Control</h3>
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Junction_Control <- traffic %>% 
+  group_by(Accident_Severity, Junction_Control, Year) %>% 
+  dplyr::summarise(n_Junction_Control = n()) %>% 
+  arrange(- n_Junction_Control)
+```
+
+
+<h3>Junction Detail </h3>
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Junction_Detail <- traffic %>% 
+  group_by(Accident_Severity, Junction_Detail, Year) %>% 
+  dplyr::summarise(n_Junction_Detail = n()) %>% 
+  arrange(- n_Junction_Detail)
+```
+
+
+<h3>Urban/Rural Area</h3>
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Urban_or_Rural_Area <- traffic %>% 
+  group_by(Accident_Severity, Urban_or_Rural_Area, Year) %>% 
+  dplyr::summarise(n_Urban_or_Rural_Area = n()) %>% 
+  arrange(- n_Urban_or_Rural_Area)
+```
+
+
+<h3>Road Type</h3>
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Road_Type <- traffic %>% 
+  group_by(Accident_Severity, Road_Type, Year) %>% 
+  dplyr::summarise(n_Road_Type = n()) %>% 
+  arrange(- n_Road_Type)
+```
+
+
+<h3>Road Survey COndition</h3>
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Road_Surface_Conditions <- traffic %>% 
+  group_by(Accident_Severity, Road_Surface_Conditions, Year) %>% 
+  dplyr::summarise(n_Road_Surface_Conditions = n()) %>% 
+  arrange(- n_Road_Surface_Conditions)
+```
+
+
+<h3>Speed Limit</h3>
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Speed_limit <- traffic %>% 
+  group_by(Accident_Severity, Speed_limit, Year) %>% 
+  dplyr::summarise(n_Speed_limit = n()) %>% 
+  arrange(- n_Speed_limit)
+```
+
+
+<h3>Weather Condition</h3>
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Weather_Conditions <- traffic %>% 
+  group_by(Accident_Severity, Weather_Conditions, Year) %>% 
+  dplyr::summarise(n_Weather_Conditions = n()) %>% 
+  arrange(- n_Weather_Conditions)
+```
+
+
+
+<h3>Light Condition</h3>
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Light_Conditions <- traffic %>% 
+  group_by(Accident_Severity, Light_Conditions, Year) %>% 
+  dplyr::summarise(n_Light_Conditions = n()) %>% 
+  arrange(- n_Light_Conditions)
+```
+
+
+
+
+
+## Data Insight {.tabset}
+
+### WHICH PERIOD MOSTLY ACCIDENT HAPPENS?
+
+#### Year
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+traffic %>%
+  group_by(Accident_Severity, Year) %>% 
+  dplyr::summarise(n_Year = n()) %>% 
+  arrange(- n_Year) %>% 
+  ggplot(aes(x = Year,
+             y = n_Year,
+             fill = Accident_Severity)) +
+  geom_col(position = "stack", stat = "identity") +
+  theme_bw() +
+  scale_fill_manual(values = rev(brewer.pal(15, "Set3"))) +
+  labs(title = "Traffic per Year X Accident Severity",
+       subtitle = "(2005-17)",
+       x = "Year",
+       y = "Freq")
+```
+
+#### Day of Week
+
+```{r}
+
+traffic %>%
+  group_by(Accident_Severity, Day_of_Week) %>% 
+  dplyr::summarise(n_Day = n()) %>% 
+  arrange(- n_Day) %>% 
+  ggplot(aes(reorder(x = Day_of_Week, -n_Day),
+             y = n_Day,
+             fill = Accident_Severity)) +
+  geom_col(position = "stack", stat = "identity") +
+  theme_bw() +
+  scale_fill_manual(values = rev(brewer.pal(7, "Set3"))) +
+  labs(title = "Traffic per Day X Accident Severity",
+       subtitle = "(2005-17)",
+       x = "Day of Week",
+       y = "Freq")
+
+head(traffic)
+```
+
+
+
+### WHICH VARIABLE HAS THE MOST IMPACT? {.tabset}
+
+#### Junction Control
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Junction_Control %>%
+  filter(Junction_Control != "Data missing or out of range") %>% 
+  ggplot(aes(fill=Junction_Control, y=n_Junction_Control, x=Accident_Severity)) + 
+  geom_bar(position="fill", stat="identity") +
+  theme_bw() +
+  labs(title = "Accident Severity X Junction Control",
+       subtitle = "(2005-17)",
+       x = "Accident Severity",
+       y = "Percentage") +
+  scale_fill_manual(values = rev(brewer.pal(5, "Set3")))
+```
+
+
+#### Junction Detail
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Junction_Detail %>%
+  ggplot(aes(fill=Junction_Detail, y=n_Junction_Detail, x=Accident_Severity)) + 
+  geom_bar(position="fill", stat="identity") +
+  theme_bw() +
+  labs(title = "Accident Severity X Junction Detail",
+       subtitle = "(2005-17)",
+       x = "Accident Severity",
+       y = "Percentage") +
+  scale_fill_manual(values = rev(brewer.pal(10, "Set3")))
+```
+
+
+#### Urban/Rural Area
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Urban_or_Rural_Area %>%
+  ggplot(aes(fill=Urban_or_Rural_Area, y=n_Urban_or_Rural_Area, x=Accident_Severity)) + 
+  geom_bar(position="fill", stat="identity") +
+  theme_bw() +
+  labs(title = "Accident Severity X Urban/Rural Area",
+       subtitle = "(2005-17)",
+       x = "Accident Severity",
+       y = "Percentage") +
+  scale_fill_manual(values = rev(brewer.pal(10, "Set3")))
+```
+
+
+#### Road Type
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Road_Type  %>%
+  ggplot(aes(fill=Road_Type, y=n_Road_Type, x=Accident_Severity)) + 
+  geom_bar(position="fill", stat="identity") +
+  theme_bw() +
+  labs(title = "Accident Severity X Road Type",
+       subtitle = "(2005-17)",
+       x = "Accident Severity",
+       y = "Percentage") +
+  scale_fill_manual(values = rev(brewer.pal(10, "Set3")))
+```
+
+
+#### Road Survey Condition
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Road_Surface_Conditions %>%
+  ggplot(aes(fill=Road_Surface_Conditions, y=n_Road_Surface_Conditions, x=Accident_Severity)) + 
+  geom_bar(position="fill", stat="identity") +
+  theme_bw() +
+  labs(title = "Accident Severity X Road Survey Condition",
+       subtitle = "(2005-17)",
+       x = "Accident Severity",
+       y = "Percentage") +
+  scale_fill_manual(values = rev(brewer.pal(10, "Set3")))
+```
+
+
+#### Speed Limit
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Speed_limit %>%
+  ggplot(aes(fill=Speed_limit, y=n_Speed_limit, x=Accident_Severity)) + 
+  geom_bar(position="fill", stat="identity") +
+  theme_bw() +
+  labs(title = "Accident Severity X Speed Limit",
+       subtitle = "(2005-17)",
+       x = "Accident Severity",
+       y = "Percentage") +
+  scale_fill_manual(values = rev(brewer.pal(10, "Set3")))
+```
+
+
+#### Weather Condition
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Weather_Conditions %>%
+  ggplot(aes(fill=Weather_Conditions, y=n_Weather_Conditions, x=Accident_Severity)) + 
+  geom_bar(position="fill", stat="identity") +
+  theme_bw() +
+  labs(title = "Accident Severity X Weather Condition",
+       subtitle = "(2005-17)",
+       x = "Accident Severity",
+       y = "Percentage") +
+  scale_fill_manual(values = rev(brewer.pal(15, "Set3")))
+```
+
+
+
+#### Light Condition
+
+```{r message=FALSE, error=FALSE, warning=FALSE}
+plot_Light_Conditions %>%
+  ggplot(aes(fill=Light_Conditions, y=n_Light_Conditions, x=Accident_Severity)) + 
+  geom_bar(position="fill", stat="identity") +
+  theme_bw() +
+  labs(title = "Accident Severity X Light Condition",
+       subtitle = "(2005-17)",
+       x = "Accident Severity",
+       y = "Percentage") +
+  scale_fill_manual(values = rev(brewer.pal(9, "Set3")))
+```
+
+
+### AREA THAT HAS FATAL ACCIDENT
+
+```{r}
+area <- traffic %>%  
+  filter(Accident_Severity == "Fatal") %>%
+  select(Accident_Severity, Police_Force, Local_Authority_.District., Longitude, Latitude) %>%
+  mutate(Accident_Severity = factor(Accident_Severity, unique(Accident_Severity))) %>%
+  mutate(Police_Force = factor(Police_Force, unique(Police_Force))) %>%
+  mutate(Local_Authority_.District. = factor(Local_Authority_.District., unique(Local_Authority_.District.))) %>%
+  add_count(Local_Authority_.District., Police_Force,sort = TRUE, name = "n_Local_District") %>% 
+  mutate(mytext = paste(
+    "Police Force: ", Police_Force , "\n",
+    "Local Authority District: ", Local_Authority_.District., "\n",
+    "Count: ", n_Local_District,
+    sep="")) %>% 
+  ggplot(aes(x = Longitude, y = Latitude)) +
+  geom_polygon(aes(x = Longitude,
+                   y = Latitude,
+                   group = Local_Authority_.District.,
+                   text = mytext,
+                   fill= Police_Force)) +
+  scale_size_continuous(range=c(1,15)) +
+  theme_void() + 
+  ylim(50,59) + 
+  coord_map() +
+  theme(legend.position="none")
+  
+area <- ggplotly(area, tooltip="text")
+area
+  
+```
+
+
